@@ -5,32 +5,36 @@
 
     <!-- Public plugin name should be written in Title Case.
      Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-name -->
-    <name>RepoPluginSource</name>
+    <name>Repo Release Source</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor url="https://www.yourcompany.com">YourCompany</vendor>
+    <vendor url="https://github.com/xenonisawesome">xenon</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-        Enter short description for your plugin here.<br>
-        <em>most HTML tags may be used</em>
+        Adds GitHub and GitLab repositories as sources for installing and updating IDE extensions from their Releases,
+        through the standard Settings | Plugins UI.
         ]]></description>
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
 
-    <resource-bundle>messages.MyMessageBundle</resource-bundle>
 
     <!-- Extensions defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
         <!-- If the plugin is published on JetBrains Marketplace, errors reported by users are available on the plugin page.
              See https://plugins.jetbrains.com/docs/marketplace/error-handler.html#developers-side for details. -->
-        <errorHandler implementation="com.intellij.diagnostic.JetBrainsMarketplaceErrorReportSubmitter"/>
-        <toolWindow id="MyToolWindow" factoryClass="io.github.xenonisawesome.MyToolWindowFactory"
-                    icon="AllIcons.Toolwindows.ToolWindowPalette"/>
+        <applicationConfigurable parentId="tools" instance="io.github.xenonisawesome.reposource.ide.RepoSourceConfigurable"
+                                 id="io.github.xenonisawesome.reposource.settings" displayName="Repo Release Sources"/>
+        <notificationGroup id="Repo Release Source" displayType="BALLOON"/>
+        <backgroundPostStartupActivity implementation="io.github.xenonisawesome.reposource.ide.Startup"/>
+
+        <!-- Internal platform API, isolated in adapter/InternalApiAdapter.kt (see SPIKE.md). -->
+        <updateSettingsProvider implementation="io.github.xenonisawesome.reposource.adapter.RepoUpdateSettingsProvider"/>
+        <pluginRepositoryAuthProvider implementation="io.github.xenonisawesome.reposource.adapter.RepoAuthProvider"/>
     </extensions>
 
 </idea-plugin>
