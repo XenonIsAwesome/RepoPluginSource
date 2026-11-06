@@ -2,6 +2,7 @@ package io.github.xenonisawesome.reposource.ide
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.options.Configurable
 import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBLabel
@@ -9,6 +10,7 @@ import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import io.github.xenonisawesome.reposource.core.RepoRef
 import java.awt.BorderLayout
+import java.awt.datatransfer.StringSelection
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -60,13 +62,25 @@ class RepoSourceConfigurable : Configurable {
             .createPanel()
 
         val check = JButton("Check now").apply { addActionListener { checkAll() } }
+        val copy = JButton("Copy catalog URL").apply {
+            toolTipText = "Copies the local updatePlugins.xml URL so you can open it in a browser"
+            addActionListener {
+                val svc = CatalogService.getInstance()
+                svc.ensureStarted()
+                CopyPasteManager.getInstance().setContents(StringSelection(svc.catalogUrl()))
+                updateServerLabel()
+                text = "Copied!"
+                javax.swing.Timer(1500) { text = "Copy catalog URL" }.apply { isRepeats = false; start() }
+            }
+        }
+        val buttons = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, JBUI.scale(6), 0)).apply { add(copy); add(check) }
         val hint = JBLabel(
             "<html>After adding a repository, open <b>Settings | Plugins | Marketplace</b> and search for its plugin. " +
                 "Installed plugins then show the usual update badge when a newer release is published.</html>"
         ).apply { foreground = JBUI.CurrentTheme.ContextHelp.FOREGROUND }
         val bottom = JPanel(BorderLayout(JBUI.scale(8), JBUI.scale(4))).apply {
             add(serverLabel, BorderLayout.CENTER)
-            add(check, BorderLayout.EAST)
+            add(buttons, BorderLayout.EAST)
             add(hint, BorderLayout.SOUTH)
             border = JBUI.Borders.emptyTop(8)
         }
