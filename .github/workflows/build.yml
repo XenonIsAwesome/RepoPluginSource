@@ -1,8 +1,7 @@
-# GitHub Actions workflow for building, testing, verifying, and releasing the plugin:
+# GitHub Actions workflow for building, testing, verifying the plugin:
 # - Build the plugin ZIP with the 'buildPlugin' task and upload it as a workflow artifact.
 # - Run the 'check' task and upload test reports on failure.
 # - Run the 'verifyPlugin' task and upload Plugin Verifier reports.
-# - Create a GitHub release with the plugin ZIP when a v* tag is pushed.
 #
 # The workflow is triggered on pushes to the 'main' branch and on pull_request events.
 #
@@ -150,40 +149,3 @@ jobs:
         with:
           name: pluginVerifier-result
           path: ${{ github.workspace }}/build/reports/pluginVerifier
-
-  # Publish a GitHub release (with the plugin zip attached) when a v* tag is pushed.
-  # The version is taken from the tag, e.g. v0.1.0 -> 0.1.0.
-  releaseTag:
-    name: Release tag
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs: [ build, test, verify ]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-
-      - name: Fetch Sources
-        uses: actions/checkout@v7
-
-      - name: Setup Java
-        uses: actions/setup-java@v6
-        with:
-          distribution: zulu
-          java-version: 21
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          cache-read-only: true
-
-      - name: Build plugin with tag version
-        run: ./gradlew buildPlugin -Pversion="${GITHUB_REF_NAME#v}"
-
-      - name: Create Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" ./build/distributions/*.zip \
-            --verify-tag \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes
