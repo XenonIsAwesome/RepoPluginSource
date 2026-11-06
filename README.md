@@ -23,7 +23,7 @@ GitLab: attach the zip as a release link (a generic package registry URL works).
 
 ## How it works
 
-* A loopback-only HTTP server (`127.0.0.1`) serves `/<random-token>/<repo-id>/updatePlugins.xml`. The port is persisted per
+* A loopback-only HTTP server (`127.0.0.1`) serves one combined `/<random-token>/updatePlugins.xml`. The port is persisted per
   IDE product; if busy, a free port is chosen, persisted, and you get a notification.
 * On each request the latest release is looked up (5 min cache + ETag), each zip asset is downloaded **once per asset id**
   and its `plugin.xml` is read. The XML points at the real HTTPS asset URL.

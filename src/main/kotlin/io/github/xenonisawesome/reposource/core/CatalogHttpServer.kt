@@ -8,13 +8,13 @@ import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 /**
- * Serves /<secret>/<repoId>/updatePlugins.xml on 127.0.0.1 only.
- * [catalogFor] returns the XML or throws [ResolveException] (shown to the user in the settings page, not in the HTTP body).
+ * Serves the single combined /<secret>/updatePlugins.xml on 127.0.0.1 only.
+ * [catalog] returns the XML or throws (details stay in the IDE, not in the HTTP body).
  */
 class CatalogHttpServer(
     private val secret: String,
-    private val catalogFor: (repoId: String) -> String?,
-    private val onError: (repoId: String, e: Throwable) -> Unit = { _, _ -> },
+    private val catalog: () -> String,
+    private val onError: (e: Throwable) -> Unit = {},
 ) {
     private var server: HttpServer? = null
     val port: Int get() = server?.address?.port ?: -1
@@ -48,17 +48,15 @@ class CatalogHttpServer(
     private fun handle(ex: HttpExchange) {
         ex.use {
             val parts = ex.requestURI.path.split('/').filter { it.isNotEmpty() }
-            val okToken = parts.size == 3 && MessageDigest.isEqual(parts[0].toByteArray(), secret.toByteArray())
-            if (ex.requestMethod != "GET" || !okToken || parts[2] != "updatePlugins.xml") {
+            val okToken = parts.size == 2 && MessageDigest.isEqual(parts[0].toByteArray(), secret.toByteArray())
+            if (ex.requestMethod != "GET" || !okToken || parts[1] != "updatePlugins.xml") {
                 reply(ex, 404, "Not found")
                 return
             }
-            val repoId = parts[1]
             try {
-                val xml = catalogFor(repoId)
-                if (xml == null) reply(ex, 404, "Not found") else reply(ex, 200, xml, "application/xml; charset=utf-8")
+                reply(ex, 200, catalog(), "application/xml; charset=utf-8")
             } catch (e: Throwable) {
-                onError(repoId, e)
+                onError(e)
                 reply(ex, 502, "Could not build the catalog; see Settings | Tools | Repo Release Sources.")
             }
         }

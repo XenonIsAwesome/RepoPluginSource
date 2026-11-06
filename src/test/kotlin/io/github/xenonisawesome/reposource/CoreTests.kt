@@ -192,16 +192,16 @@ class MockServerTest {
 
 class ServerAndAuthTest {
     @Test fun serverBindsLoopbackChecksTokenAndFallsBackOnPortConflict() {
-        val a = CatalogHttpServer("tok", { id -> if (id == "r1") "<plugins/>" else null })
+        val a = CatalogHttpServer("tok", { "<plugins/>" })
         val port = a.start(0)
         try {
             fun code(path: String) = (URL("http://127.0.0.1:$port$path").openConnection() as HttpURLConnection).responseCode
-            assertEquals(200, code("/tok/r1/updatePlugins.xml"))
-            assertEquals(404, code("/wrong/r1/updatePlugins.xml"))
-            assertEquals(404, code("/tok/nope/updatePlugins.xml"))
+            assertEquals(200, code("/tok/updatePlugins.xml"))
+            assertEquals(404, code("/wrong/updatePlugins.xml"))
+            assertEquals(404, code("/tok/r1/updatePlugins.xml"))
             assertEquals(404, code("/"))
             assertEquals("127.0.0.1", a.javaClass.getDeclaredField("server").also { it.isAccessible = true }.get(a).let { (it as HttpServer).address.address.hostAddress })
-            val b = CatalogHttpServer("tok", { null })
+            val b = CatalogHttpServer("tok", { "" })
             val port2 = b.start(port) // preferred port occupied
             try { assertNotEquals(port, port2) } finally { b.stop() }
         } finally { a.stop() }
@@ -211,7 +211,7 @@ class ServerAndAuthTest {
         val s = CatalogHttpServer("t", { throw ResolveException("secret detail") })
         val p = s.start(0)
         try {
-            val c = URL("http://127.0.0.1:$p/t/x/updatePlugins.xml").openConnection() as HttpURLConnection
+            val c = URL("http://127.0.0.1:$p/t/updatePlugins.xml").openConnection() as HttpURLConnection
             assertEquals(502, c.responseCode)
             assertFalse(c.errorStream.readAllBytes().toString(Charsets.UTF_8).contains("secret"))
         } finally { s.stop() }

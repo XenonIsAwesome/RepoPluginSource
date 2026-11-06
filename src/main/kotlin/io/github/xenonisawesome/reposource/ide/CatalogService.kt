@@ -17,12 +17,12 @@ import io.github.xenonisawesome.reposource.core.ResolveException
 class CatalogService : Disposable {
     private val log = logger<CatalogService>()
     private val engine = CatalogEngine(JdkHttpFetcher())
+    private val pool = java.util.concurrent.Executors.newFixedThreadPool(4) { r -> Thread(r, "RepoReleaseSource-resolve").apply { isDaemon = true } }
     private val settings get() = RepoSourceSettings.getInstance()
-    private val lastErrors = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val server = CatalogHttpServer(
         secret = settings.pathToken(),
-        catalogFor = { id -> catalogXml(id) },
-        onError = { id, e -> lastErrors[id] = message(e); log.info("Catalog for $id failed: ${message(e)}") },
+        catalog = { combinedXml() },
+        onError = { e -> log.info("Combined catalog failed: ${message(e)}") },
     )
 
     val port: Int get() = server.port
@@ -47,11 +47,12 @@ class CatalogService : Disposable {
         }
     }
 
-    fun catalogUrl(repo: RepoRef): String = "http://127.0.0.1:$port/${settings.pathToken()}/${repo.id}/updatePlugins.xml"
+    /** The one combined catalog URL; independent of which repositories are configured, so it stays stable. */
+    fun catalogUrl(): String = "http://127.0.0.1:$port/${settings.pathToken()}/updatePlugins.xml"
 
     fun catalogUrls(): List<String> {
         ensureStarted()
-        return settings.repos().map { catalogUrl(it) }
+        return listOf(catalogUrl())
     }
 
     fun check(repo: RepoRef, tokenOverride: String? = null): RepoCatalog =
@@ -59,14 +60,26 @@ class CatalogService : Disposable {
 
     fun invalidate(repoId: String) = engine.invalidate(repoId)
 
-    private fun catalogXml(repoId: String): String? {
-        val repo = settings.repos().firstOrNull { it.id == repoId } ?: return null
-        val catalog = engine.resolve(repo, RepoTokens.get(repo.id))
-        lastErrors.remove(repoId)
-        return CatalogXml.render(catalog.plugins)
+    /**
+     * All repositories in one catalog. A failing repository is skipped (its problem shows in the settings page)
+     * so one broken or private-without-token repo never hides the others. If every repository fails, the request fails.
+     */
+    private fun combinedXml(): String {
+        val repos = settings.repos()
+        if (repos.isEmpty()) return CatalogXml.render(emptyList())
+        val results = repos.map { repo ->
+            java.util.concurrent.CompletableFuture.supplyAsync({
+                runCatching { engine.resolve(repo, RepoTokens.get(repo.id)) }
+            }, pool)
+        }.map { it.join() }
+        val ok = results.mapNotNull { it.getOrNull() }
+        if (ok.isEmpty()) throw results.first().exceptionOrNull() ?: ResolveException("No plugins found")
+        // The same plugin id in two repositories: the first repository in the list wins.
+        val plugins = ok.flatMap { it.plugins }.distinctBy { it.id }
+        return CatalogXml.render(plugins)
     }
 
-    override fun dispose() = server.stop()
+    override fun dispose() { server.stop(); pool.shutdownNow() }
 
     companion object {
         fun getInstance(): CatalogService = service()
