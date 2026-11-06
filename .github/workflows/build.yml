@@ -10,11 +10,15 @@
 
 name: Build
 on:
-  # Trigger the workflow on pushes to only the 'main' branch (this avoids duplicate checks being run e.g., for dependabot pull requests)
+  # Run on every push
   push:
-    branches: [ main ]
   # Trigger the workflow on any pull request
   pull_request:
+  # Weekly run (Mondays 05:00 UTC): a newly released CLion that breaks the plugin gets flagged
+  # without any code change, because verifyPlugin selects the latest CLion releases/EAP/RC dynamically.
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -151,7 +155,7 @@ jobs:
   # If accepted and published, the release workflow would be triggered
   releaseDraft:
     name: Release draft
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [ build, test, verify ]
     runs-on: ubuntu-latest
     permissions:
